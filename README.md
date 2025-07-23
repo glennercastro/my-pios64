@@ -43,13 +43,31 @@ Este script automatiza a instalação completa do **Cockpit** - uma interface we
 | **🌡️ Cockpit-Sensors** | Monitoramento de hardware | Temperatura, voltagem, sensores do sistema |
 
 
-# 2. CasaOS 
+# 2. CasaOS Auto-Installer
+
+- 🏠 **Sistema doméstico completo** - Transforme seu Pi em um hub doméstico inteligente
+- 🎯 **Interface moderna** - Dashboard web responsivo e intuitivo
+- 📦 **App Store integrado** - Instale aplicações com um clique
+- 🐳 **Docker nativo** - Gerenciamento visual de containers
+- 🔄 **Automação residencial** - Integração com dispositivos IoT
+- 📁 **Gerenciamento de arquivos** - Explorer web completo
+
+## 🔧 Recursos Principais
+
+| Recurso | Descrição | Funcionalidade |
+|---------|-----------|----------------|
+| **🏠 Dashboard Principal** | Interface web moderna | Controle centralizado de todos os serviços |
+| **📱 App Store** | Loja de aplicações integrada | Instalação de apps com um clique |
+| **📁 File Manager** | Gerenciador de arquivos web | Upload, download e organização de arquivos |
+| **🐳 Docker Manager** | Interface visual para Docker | Gerenciamento completo de containers |
+| **🔄 Sync Center** | Sincronização de dados | Backup e sync entre dispositivos |
+| **🌐 Smart Home Hub** | Central de automação | Controle de dispositivos IoT |
 
 
 ## 🚀 Instalação
 
-cockpit-instal.sh
 
+Baixe o script [cockpit-instal.sh](https://github.com/glennercastro/my-pios64/blob/main/cockpit-instal.sh) ou [install_casaos.sh](https://github.com/glennercastro/my-pios64/blob/main/install_casaos.sh)
 
 
 ### Instalação Rápida
