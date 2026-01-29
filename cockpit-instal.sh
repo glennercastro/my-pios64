@@ -31,10 +31,6 @@ echo ""
 echo "4. Adicionando repositório backports..."
 echo "deb http://deb.debian.org/debian ${VERSION_CODENAME}-backports main" | sudo tee /etc/apt/sources.list.d/backports.list
 
-# 5. (REMOVIDO - Incompatível com Debian 13)
-echo ""
-echo "5. Pulando repositório 45Drives (instalação via GitHub)..."
-
 # 6. Atualizar lista de pacotes
 echo ""
 echo "6. Atualizando lista de pacotes..."
