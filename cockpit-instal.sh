@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Script de Instalação do Cockpit + Plugins para Raspberry Pi OS 64 Lite
-# Compatível com ARM64 - 
+# Compatível com ARM64 - Corrigido para Debian 13 (Trixie)
 # Inclui: files, navigator, sensors, file-sharing, storaged
 
-set -e  # Para se houver erro
+set -e # Para se houver erro
 
 echo "============================================================="
 echo "=== INSTALAÇÃO COCKPIT + PLUGINS - Pi OS 64 ARM64 (SEM TAILSCALE) ==="
@@ -31,10 +31,9 @@ echo ""
 echo "4. Adicionando repositório backports..."
 echo "deb http://deb.debian.org/debian ${VERSION_CODENAME}-backports main" | sudo tee /etc/apt/sources.list.d/backports.list
 
-# 5. Adicionar repositório 45Drives (para file-sharing)
+# 5. (REMOVIDO - Incompatível com Debian 13)
 echo ""
-echo "5. Adicionando repositório 45Drives..."
-curl -sSL https://repo.45drives.com/setup | sudo bash
+echo "5. Pulando repositório 45Drives (instalação via GitHub)..."
 
 # 6. Atualizar lista de pacotes
 echo ""
@@ -57,18 +56,15 @@ echo ""
 echo "9. Tentando instalar Cockpit-Files..."
 sudo apt install -t ${VERSION_CODENAME}-backports cockpit-files -y || echo "Cockpit-Files não disponível no repositório, continuando..."
 
-# 10. Instalar Cockpit-File-Sharing
+# 10. Instalar Cockpit-File-Sharing do GitHub
 echo ""
-echo "10. Instalando Cockpit-File-Sharing..."
-sudo apt install cockpit-file-sharing -y || {
-    echo "Instalando do GitHub como alternativa..."
-    cd /tmp
-    git clone https://github.com/45Drives/cockpit-file-sharing.git
-    cd cockpit-file-sharing
-    sudo make install
-    cd /tmp
-    rm -rf cockpit-file-sharing
-}
+echo "10. Instalando Cockpit-File-Sharing do GitHub..."
+cd /tmp
+git clone https://github.com/45Drives/cockpit-file-sharing.git
+cd cockpit-file-sharing
+sudo make install
+cd /tmp
+rm -rf cockpit-file-sharing
 
 # 11. Instalar Cockpit-Navigator do GitHub
 echo ""
@@ -76,7 +72,7 @@ echo "11. Instalando Cockpit-Navigator do GitHub..."
 cd /tmp
 git clone https://github.com/45Drives/cockpit-navigator.git
 cd cockpit-navigator
-git checkout v0.5.10  # Versão mais estável
+git checkout v0.5.10 # Versão mais estável
 sudo make install
 cd /tmp
 rm -rf cockpit-navigator
@@ -157,6 +153,7 @@ echo "   ✅ Cockpit-Sensors (monitoramento de temperatura/hardware)"
 echo ""
 echo "🚫 **REMOVIDO:**"
 echo "   ❌ Cockpit-Tailscale (removido por problemas de compatibilidade)"
+echo "   ❌ Repositório 45Drives (incompatível com Debian 13)"
 echo ""
 echo "🔐 **LOGIN:**"
 echo "   Use suas credenciais de usuário do sistema para fazer login"
