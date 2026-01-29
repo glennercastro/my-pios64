@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Script de Instalação do Cockpit + Plugins para Raspberry Pi OS 64 Lite
-# Compatível com ARM64 - Corrigido para Debian 13 (Trixie)
-# Inclui: files, navigator, sensors, file-sharing, storaged
+# Compatível com ARM64 - Totalmente corrigido para Debian 13 (Trixie)
+# Inclui: navigator, sensors, file-sharing, storaged
 
 set -e # Para se houver erro
 
 echo "============================================================="
-echo "=== INSTALAÇÃO COCKPIT + PLUGINS - Pi OS 64 ARM64 (SEM TAILSCALE) ==="
+echo "=== INSTALAÇÃO COCKPIT + PLUGINS - Pi OS 64 ARM64 ==="
 echo "============================================================="
 echo ""
 
@@ -16,62 +16,70 @@ echo "1. Atualizando o sistema..."
 sudo apt update
 sudo apt upgrade -y
 
-# 2. Instalar dependências básicas
+# 2. Instalar dependências completas (incluindo moreutils e yarn)
 echo ""
-echo "2. Instalando dependências..."
-sudo apt install -y curl wget git python3 rsync zip npm nodejs gettext make gcc g++ lm-sensors samba nfs-kernel-server build-essential
+echo "2. Instalando todas as dependências necessárias..."
+sudo apt install -y curl wget git python3 rsync zip gettext make gcc g++ lm-sensors samba nfs-kernel-server build-essential moreutils
 
-# 3. Configurar variáveis do sistema
+# 3. Instalar Node.js e npm (versão correta)
 echo ""
-echo "3. Configurando variáveis do sistema..."
+echo "3. Instalando Node.js e npm..."
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# 4. Instalar Yarn globalmente
+echo ""
+echo "4. Instalando Yarn..."
+sudo npm install -g yarn
+
+# 5. Configurar variáveis do sistema
+echo ""
+echo "5. Configurando variáveis do sistema..."
 . /etc/os-release
 
-# 4. Adicionar repositório backports
+# 6. Adicionar repositório backports
 echo ""
-echo "4. Adicionando repositório backports..."
+echo "6. Adicionando repositório backports..."
 echo "deb http://deb.debian.org/debian ${VERSION_CODENAME}-backports main" | sudo tee /etc/apt/sources.list.d/backports.list
 
-# 6. Atualizar lista de pacotes
+# 7. Atualizar lista de pacotes
 echo ""
-echo "6. Atualizando lista de pacotes..."
+echo "7. Atualizando lista de pacotes..."
 sudo apt update
 
-# 7. Instalar Cockpit principal + Storaged
+# 8. Instalar Cockpit principal + Storaged
 echo ""
-echo "7. Instalando Cockpit principal + gerenciamento de armazenamento..."
+echo "8. Instalando Cockpit principal + gerenciamento de armazenamento..."
 sudo apt install -t ${VERSION_CODENAME}-backports cockpit cockpit-storaged -y
 
-# 8. Habilitar e iniciar Cockpit
+# 9. Habilitar e iniciar Cockpit
 echo ""
-echo "8. Habilitando e iniciando Cockpit..."
+echo "9. Habilitando e iniciando Cockpit..."
 sudo systemctl enable cockpit.socket
 sudo systemctl start cockpit.socket
 
-# 9. Instalar Cockpit-Files (se disponível no repositório)
+# 10. Instalar Cockpit-Navigator do GitHub
 echo ""
-echo "9. Tentando instalar Cockpit-Files..."
-sudo apt install -t ${VERSION_CODENAME}-backports cockpit-files -y || echo "Cockpit-Files não disponível no repositório, continuando..."
-
-# 10. Instalar Cockpit-File-Sharing do GitHub
-echo ""
-echo "10. Instalando Cockpit-File-Sharing do GitHub..."
-cd /tmp
-git clone https://github.com/45Drives/cockpit-file-sharing.git
-cd cockpit-file-sharing
-sudo make install
-cd /tmp
-rm -rf cockpit-file-sharing
-
-# 11. Instalar Cockpit-Navigator do GitHub
-echo ""
-echo "11. Instalando Cockpit-Navigator do GitHub..."
+echo "10. Instalando Cockpit-Navigator do GitHub..."
 cd /tmp
 git clone https://github.com/45Drives/cockpit-navigator.git
 cd cockpit-navigator
-git checkout v0.5.10 # Versão mais estável
+git checkout v0.5.10
+make
 sudo make install
 cd /tmp
 rm -rf cockpit-navigator
+
+# 11. Instalar Cockpit-File-Sharing do GitHub
+echo ""
+echo "11. Instalando Cockpit-File-Sharing do GitHub..."
+cd /tmp
+git clone https://github.com/45Drives/cockpit-file-sharing.git
+cd cockpit-file-sharing
+make
+sudo make install
+cd /tmp
+rm -rf cockpit-file-sharing
 
 # 12. Instalar Cockpit-Sensors
 echo ""
@@ -142,34 +150,32 @@ echo ""
 echo "📋 **PLUGINS INSTALADOS:**"
 echo "   ✅ Cockpit Principal (interface base)"
 echo "   ✅ Cockpit-Storaged (monitoramento e gerenciamento de disco)"
-echo "   ✅ Cockpit-Files (navegador de arquivos básico)"
-echo "   ✅ Cockpit-File-Sharing (compartilhamentos Samba/NFS)"
 echo "   ✅ Cockpit-Navigator (navegador de arquivos avançado)"
+echo "   ✅ Cockpit-File-Sharing (compartilhamentos Samba/NFS)"
 echo "   ✅ Cockpit-Sensors (monitoramento de temperatura/hardware)"
-echo ""
-echo "🚫 **REMOVIDO:**"
-echo "   ❌ Cockpit-Tailscale (removido por problemas de compatibilidade)"
-echo "   ❌ Repositório 45Drives (incompatível com Debian 13)"
 echo ""
 echo "🔐 **LOGIN:**"
 echo "   Use suas credenciais de usuário do sistema para fazer login"
 echo "   (mesmo usuário e senha que você usa no SSH)"
 echo ""
-echo "📝 **CONFIGURAÇÕES ADICIONAIS NECESSÁRIAS:**"
-echo "   • Para usuários Samba: sudo smbpasswd -a SEU_USUARIO"
-echo "   • Para NFS: configurações em /etc/exports"
+echo "📝 **CONFIGURAÇÕES ADICIONAIS:**"
+echo "   • Para criar usuário Samba: sudo smbpasswd -a SEU_USUARIO"
+echo "   • Para NFS: edite /etc/exports"
 echo ""
 echo "🎯 **RECURSOS DISPONÍVEIS:**"
 echo "   • Monitoramento de sistema em tempo real"
 echo "   • Gerenciamento completo de discos e partições"
-echo "   • Compartilhamento de arquivos Samba/NFS"
+echo "   • Compartilhamento de arquivos Samba/NFS via interface web"
 echo "   • Navegação e upload de arquivos via web"
 echo "   • Monitoramento de sensores e temperatura"
 echo "   • Terminal integrado via web"
 echo "   • Logs do sistema centralizados"
+echo "   • Gerenciamento de serviços systemd"
+echo "   • Gestão de usuários e grupos"
+echo "   • Configuração de rede"
 echo ""
 echo "🔍 **ONDE ENCONTRAR OS PLUGINS:**"
-echo "   Todos os plugins estarão na seção 'Applications' do Cockpit"
+echo "   Todos os plugins estarão visíveis no menu lateral do Cockpit"
 echo ""
 echo "============================================================="
 echo "🎉 SEU RASPBERRY PI ESTÁ PRONTO PARA GERENCIAMENTO WEB!"
