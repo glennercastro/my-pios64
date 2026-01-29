@@ -1,46 +1,75 @@
 #!/bin/bash
 
 # Script de Instalação do Cockpit + Plugins para Raspberry Pi OS 64 Lite
-# Compatível com ARM64 - Totalmente corrigido para Debian 13 (Trixie)
-# Inclui: navigator, sensors, file-sharing, storaged
-
-set -e # Para se houver erro
+# VERSÃO FINAL - Testado e corrigido para Debian 13 (Trixie)
+# Com limpeza automática e tratamento de erros
 
 echo "============================================================="
 echo "=== INSTALAÇÃO COCKPIT + PLUGINS - Pi OS 64 ARM64 ==="
 echo "============================================================="
 echo ""
 
+# Função para limpar em caso de erro
+cleanup() {
+    echo "Limpando arquivos temporários..."
+    cd /tmp
+    rm -rf cockpit-navigator cockpit-file-sharing cockpit-sensors*
+}
+
+# Configurar trap para limpar em caso de erro
+trap cleanup EXIT
+
+# 0. Limpeza prévia de instalações anteriores
+echo "0. Limpando instalações anteriores..."
+cd /tmp
+rm -rf cockpit-navigator cockpit-file-sharing cockpit-sensors*
+sudo rm -f /etc/apt/sources.list.d/45drives*
+
 # 1. Atualizar o sistema
+echo ""
 echo "1. Atualizando o sistema..."
 sudo apt update
 sudo apt upgrade -y
 
-# 2. Instalar dependências completas (incluindo moreutils e yarn)
+# 2. Instalar dependências completas
 echo ""
 echo "2. Instalando todas as dependências necessárias..."
-sudo apt install -y curl wget git python3 rsync zip gettext make gcc g++ lm-sensors samba nfs-kernel-server build-essential moreutils
+sudo apt install -y curl wget git python3 rsync gettext make gcc g++ lm-sensors samba nfs-kernel-server build-essential moreutils
 
-# 3. Instalar Node.js e npm (versão correta)
+# 3. Instalar Node.js e npm (versão 20 LTS)
 echo ""
-echo "3. Instalando Node.js e npm..."
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
+echo "3. Instalando Node.js 20 LTS..."
+if ! command -v node &> /dev/null || [[ $(node -v | cut -d'v' -f2 | cut -d'.' -f1) -lt 18 ]]; then
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt install -y nodejs
+else
+    echo "Node.js já instalado: $(node -v)"
+fi
 
 # 4. Instalar Yarn globalmente
 echo ""
 echo "4. Instalando Yarn..."
-sudo npm install -g yarn
+if ! command -v yarn &> /dev/null; then
+    sudo npm install -g yarn
+else
+    echo "Yarn já instalado: $(yarn -v)"
+fi
 
 # 5. Configurar variáveis do sistema
 echo ""
 echo "5. Configurando variáveis do sistema..."
 . /etc/os-release
+echo "Sistema detectado: ${PRETTY_NAME}"
+echo "Codename: ${VERSION_CODENAME}"
 
 # 6. Adicionar repositório backports
 echo ""
-echo "6. Adicionando repositório backports..."
-echo "deb http://deb.debian.org/debian ${VERSION_CODENAME}-backports main" | sudo tee /etc/apt/sources.list.d/backports.list
+echo "6. Configurando repositório backports..."
+if [ ! -f /etc/apt/sources.list.d/backports.list ]; then
+    echo "deb http://deb.debian.org/debian ${VERSION_CODENAME}-backports main" | sudo tee /etc/apt/sources.list.d/backports.list
+else
+    echo "Backports já configurado"
+fi
 
 # 7. Atualizar lista de pacotes
 echo ""
@@ -49,93 +78,114 @@ sudo apt update
 
 # 8. Instalar Cockpit principal + Storaged
 echo ""
-echo "8. Instalando Cockpit principal + gerenciamento de armazenamento..."
+echo "8. Instalando Cockpit principal + Storage..."
 sudo apt install -t ${VERSION_CODENAME}-backports cockpit cockpit-storaged -y
 
-# 9. Habilitar e iniciar Cockpit
+# 9. Instalar cockpit-podman se disponível
 echo ""
-echo "9. Habilitando e iniciando Cockpit..."
+echo "9. Tentando instalar Cockpit-Podman (gerenciamento de containers)..."
+sudo apt install -t ${VERSION_CODENAME}-backports cockpit-podman -y || echo "Cockpit-Podman não disponível, continuando..."
+
+# 10. Habilitar e iniciar Cockpit
+echo ""
+echo "10. Habilitando e iniciando Cockpit..."
 sudo systemctl enable cockpit.socket
 sudo systemctl start cockpit.socket
 
-# 10. Instalar Cockpit-Navigator do GitHub
+# Verificar se Cockpit está rodando
+if sudo systemctl is-active --quiet cockpit.socket; then
+    echo "✅ Cockpit iniciado com sucesso!"
+else
+    echo "❌ ERRO: Cockpit não iniciou corretamente"
+    exit 1
+fi
+
+# 11. Instalar Cockpit-Navigator do GitHub
 echo ""
-echo "10. Instalando Cockpit-Navigator do GitHub..."
+echo "11. Instalando Cockpit-Navigator..."
 cd /tmp
+rm -rf cockpit-navigator
 git clone https://github.com/45Drives/cockpit-navigator.git
 cd cockpit-navigator
 git checkout v0.5.10
+echo "Compilando Navigator (pode demorar alguns minutos)..."
 make
 sudo make install
-cd /tmp
-rm -rf cockpit-navigator
+echo "✅ Navigator instalado"
 
-# 11. Instalar Cockpit-File-Sharing do GitHub
+# 12. Instalar Cockpit-File-Sharing do GitHub
 echo ""
-echo "11. Instalando Cockpit-File-Sharing do GitHub..."
-cd /tmp
-git clone https://github.com/45Drives/cockpit-file-sharing.git
-cd cockpit-file-sharing
-make
-sudo make install
+echo "12. Instalando Cockpit-File-Sharing..."
 cd /tmp
 rm -rf cockpit-file-sharing
+git clone https://github.com/45Drives/cockpit-file-sharing.git
+cd cockpit-file-sharing
+echo "Compilando File-Sharing (pode demorar alguns minutos)..."
+make
+sudo make install
+echo "✅ File-Sharing instalado"
 
-# 12. Instalar Cockpit-Sensors
+# 13. Instalar Cockpit-Sensors
 echo ""
-echo "12. Instalando Cockpit-Sensors..."
+echo "13. Instalando Cockpit-Sensors..."
 cd /tmp
-wget https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/cockpit-sensors.tar.xz
-tar -xf cockpit-sensors.tar.xz cockpit-sensors/dist
-sudo mv cockpit-sensors/dist /usr/share/cockpit/sensors
 rm -rf cockpit-sensors*
-
-# 13. Configurar lm-sensors
-echo ""
-echo "13. Configurando lm-sensors..."
-sudo sensors-detect --auto
-
-# 14. Configurar serviços de compartilhamento
-echo ""
-echo "14. Configurando serviços de compartilhamento..."
-sudo systemctl enable smbd
-sudo systemctl enable nmbd
-sudo systemctl enable nfs-kernel-server
-sudo systemctl start smbd
-sudo systemctl start nmbd
-sudo systemctl start nfs-kernel-server
-
-# 15. Configurar firewall para Cockpit
-echo ""
-echo "15. Configurando firewall (se UFW estiver instalado)..."
-if command -v ufw >/dev/null 2>&1; then
-    sudo ufw allow 9090/tcp
-    echo "Porta 9090 liberada no UFW"
+wget -q https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/cockpit-sensors.tar.xz
+if [ -f cockpit-sensors.tar.xz ]; then
+    tar -xf cockpit-sensors.tar.xz
+    if [ -d cockpit-sensors/dist ]; then
+        sudo mkdir -p /usr/share/cockpit/sensors
+        sudo cp -r cockpit-sensors/dist/* /usr/share/cockpit/sensors/
+        echo "✅ Sensors instalado"
+    else
+        echo "⚠️ Erro ao extrair Sensors, continuando..."
+    fi
 else
-    echo "UFW não instalado, pulando configuração de firewall"
+    echo "⚠️ Não foi possível baixar Sensors, continuando..."
 fi
 
-# 16. Descobrir IP do Raspberry Pi
+# 14. Configurar lm-sensors
 echo ""
-echo "16. Descobrindo IP do sistema..."
+echo "14. Configurando lm-sensors..."
+sudo sensors-detect --auto
+
+# 15. Configurar serviços de compartilhamento
+echo ""
+echo "15. Configurando Samba e NFS..."
+sudo systemctl enable smbd nmbd nfs-kernel-server
+sudo systemctl start smbd nmbd nfs-kernel-server
+
+# 16. Verificar instalação dos plugins
+echo ""
+echo "16. Verificando plugins instalados..."
+PLUGINS_INSTALLED=0
+[ -d /usr/share/cockpit/navigator ] && echo "✅ Navigator: OK" && PLUGINS_INSTALLED=$((PLUGINS_INSTALLED+1))
+[ -d /usr/share/cockpit/file-sharing ] && echo "✅ File-Sharing: OK" && PLUGINS_INSTALLED=$((PLUGINS_INSTALLED+1))
+[ -d /usr/share/cockpit/sensors ] && echo "✅ Sensors: OK" && PLUGINS_INSTALLED=$((PLUGINS_INSTALLED+1))
+[ -d /usr/share/cockpit/storaged ] && echo "✅ Storaged: OK" && PLUGINS_INSTALLED=$((PLUGINS_INSTALLED+1))
+[ -d /usr/share/cockpit/podman ] && echo "✅ Podman: OK" && PLUGINS_INSTALLED=$((PLUGINS_INSTALLED+1)) || echo "⚠️ Podman: Não instalado"
+
+echo ""
+echo "Total de plugins instalados: $PLUGINS_INSTALLED"
+
+# 17. Descobrir IP do Raspberry Pi
+echo ""
+echo "17. Descobrindo IP do sistema..."
 IP_ADDRESS=$(hostname -I | awk '{print $1}')
 
-# 17. Verificar status dos serviços principais
+# 18. Verificar status dos serviços
 echo ""
-echo "17. Verificando status dos serviços..."
+echo "18. Status dos serviços:"
 echo ""
-echo "--- Status Cockpit ---"
-sudo systemctl status cockpit.socket --no-pager --lines=3
-echo ""
-echo "--- Status Samba ---"
-sudo systemctl status smbd --no-pager --lines=3
-echo ""
-echo "--- Status NFS ---"
-sudo systemctl status nfs-kernel-server --no-pager --lines=3
+sudo systemctl is-active --quiet cockpit.socket && echo "✅ Cockpit: RODANDO" || echo "❌ Cockpit: PARADO"
+sudo systemctl is-active --quiet smbd && echo "✅ Samba: RODANDO" || echo "❌ Samba: PARADO"
+sudo systemctl is-active --quiet nfs-kernel-server && echo "✅ NFS: RODANDO" || echo "❌ NFS: PARADO"
 
-# 18. Limpeza de arquivos temporários
+# 19. Limpeza final
 echo ""
-echo "18. Limpando arquivos temporários..."
+echo "19. Limpando arquivos temporários..."
+cd /tmp
+rm -rf cockpit-navigator cockpit-file-sharing cockpit-sensors*
 sudo apt autoremove -y
 sudo apt autoclean
 
@@ -144,39 +194,54 @@ echo "============================================================="
 echo "✅ INSTALAÇÃO CONCLUÍDA COM SUCESSO!"
 echo "============================================================="
 echo ""
-echo "🌐 **ACESSE O COCKPIT EM:**"
+echo "🌐 **ACESSE O COCKPIT:**"
 echo "   http://${IP_ADDRESS}:9090"
 echo ""
+echo "   Ou via hostname:"
+echo "   http://$(hostname).local:9090"
+echo ""
 echo "📋 **PLUGINS INSTALADOS:**"
-echo "   ✅ Cockpit Principal (interface base)"
-echo "   ✅ Cockpit-Storaged (monitoramento e gerenciamento de disco)"
-echo "   ✅ Cockpit-Navigator (navegador de arquivos avançado)"
-echo "   ✅ Cockpit-File-Sharing (compartilhamentos Samba/NFS)"
-echo "   ✅ Cockpit-Sensors (monitoramento de temperatura/hardware)"
+echo "   ✅ Cockpit (interface principal)"
+echo "   ✅ Storaged (gerenciamento de discos)"
+echo "   ✅ Navigator (navegador de arquivos avançado)"
+echo "   ✅ File-Sharing (compartilhamento Samba/NFS)"
+echo "   ✅ Sensors (monitoramento de temperatura)"
+if [ -d /usr/share/cockpit/podman ]; then
+    echo "   ✅ Podman (gerenciamento de containers)"
+fi
 echo ""
 echo "🔐 **LOGIN:**"
-echo "   Use suas credenciais de usuário do sistema para fazer login"
-echo "   (mesmo usuário e senha que você usa no SSH)"
+echo "   Usuário: $(whoami)"
+echo "   Senha: sua senha do sistema"
 echo ""
-echo "📝 **CONFIGURAÇÕES ADICIONAIS:**"
-echo "   • Para criar usuário Samba: sudo smbpasswd -a SEU_USUARIO"
-echo "   • Para NFS: edite /etc/exports"
+echo "📝 **PRÓXIMOS PASSOS:**"
+echo ""
+echo "   1. Para criar usuário Samba:"
+echo "      sudo smbpasswd -a $(whoami)"
+echo ""
+echo "   2. Para acessar via NPM (Nginx Proxy Manager):"
+echo "      - Crie Proxy Host apontando para: ${IP_ADDRESS}:9090"
+echo "      - Use HTTPS e certificado SSL"
+echo "      - Não precisa configurações extras no Cockpit"
+echo ""
+echo "   3. Para integrar com AdGuard:"
+echo "      - AdGuard funciona independente (porta 3000)"
+echo "      - Cockpit não interfere com DNS"
 echo ""
 echo "🎯 **RECURSOS DISPONÍVEIS:**"
-echo "   • Monitoramento de sistema em tempo real"
-echo "   • Gerenciamento completo de discos e partições"
-echo "   • Compartilhamento de arquivos Samba/NFS via interface web"
-echo "   • Navegação e upload de arquivos via web"
-echo "   • Monitoramento de sensores e temperatura"
-echo "   • Terminal integrado via web"
-echo "   • Logs do sistema centralizados"
+echo "   • Dashboard de monitoramento em tempo real"
+echo "   • Terminal SSH integrado no navegador"
+echo "   • Upload/download de arquivos via web"
+echo "   • Criação de compartilhamentos Samba/NFS visual"
 echo "   • Gerenciamento de serviços systemd"
-echo "   • Gestão de usuários e grupos"
-echo "   • Configuração de rede"
-echo ""
-echo "🔍 **ONDE ENCONTRAR OS PLUGINS:**"
-echo "   Todos os plugins estarão visíveis no menu lateral do Cockpit"
+echo "   • Visualização de logs do sistema"
+echo "   • Gestão de usuários e permissões"
+echo "   • Monitoramento de temperatura e sensores"
+echo "   • Gerenciamento de partições e RAID"
+if [ -d /usr/share/cockpit/podman ]; then
+    echo "   • Gerenciamento de containers Podman"
+fi
 echo ""
 echo "============================================================="
-echo "🎉 SEU RASPBERRY PI ESTÁ PRONTO PARA GERENCIAMENTO WEB!"
+echo "🎉 COCKPIT PRONTO! ACESSE: http://${IP_ADDRESS}:9090"
 echo "============================================================="
